@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
 import datetime
-import dateutil.parser
 import itertools
 import multiprocessing as mp
 import warnings
 
+import dateutil.parser
 import numpy as np
 import scipy.interpolate as si
 import scipy.signal
