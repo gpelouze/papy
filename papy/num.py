@@ -1,14 +1,67 @@
-#!/usr/bin/env python3
+''' Numerical tools, and probably the messiest file. '''
 
-import datetime
 import itertools
 import multiprocessing as mp
 import warnings
 
-import dateutil.parser
 import numpy as np
 import scipy.interpolate as si
-import scipy.signal
+
+# Manipulate array dimensions -------------------------------------------------
+
+def almost_identical(arr, threshold, **kwargs):
+    ''' Reduce an array of almost identical values to a single one.
+
+    Parameters
+    ==========
+    arr : np.ndarray
+        An array of almost identical values.
+    threshold : float
+        The maximum standard deviation that is tolerated for the values in arr.
+    **kwargs :
+        Passed to np.std and np.average. Can be used to reduce arr across a
+        choosen dimension.
+
+    Raises
+    ======
+    ValueError if the standard deviation of the values in arr exceedes the
+    specified threshold value
+
+    Returns
+    =======
+    average : float or np.ndarray
+        The average value of arr.
+    '''
+
+    irregularity = np.std(arr, **kwargs)
+    if np.any(irregularity > threshold):
+        msg = 'Uneven array:\n'
+        irr_stats = [
+            ('irregularity:', irregularity),
+            ('irr. mean:', np.mean(irregularity)),
+            ('irr. std:', np.std(irregularity)),
+            ('irr. min:', np.min(irregularity)),
+            ('irr. max:', np.max(irregularity)),
+            ]
+        for title, value in irr_stats:
+            msg += '{} {}\n'.format(title, value)
+        msg += 'array percentiles:\n'
+        percentiles = [0, 1, 25, 50, 75, 99, 100]
+        for percentile in percentiles:
+            m = '{: 5d}: {:.2f}\n'
+            m = m.format(percentile, np.percentile(arr, percentile))
+            msg += m
+        raise ValueError(msg)
+
+    return np.average(arr, **kwargs)
+
+def chunks(array, n):
+    ''' Split array chunks of size n.
+
+    http://stackoverflow.com/a/1751478/4352108
+    '''
+    n = max(1, n)
+    return (array[i:i+n] for i in range(0, len(array), n))
 
 def rebin(arr, binning, cut_to_bin=False, method=np.sum):
     ''' Rebin an array by summing its pixels values.
@@ -40,13 +93,13 @@ def rebin(arr, binning, cut_to_bin=False, method=np.sum):
             m = m.format(tuple(np.array(arr.shape) - new_shape_residual))
             print(m)
             new_slice = [slice(None, -i) if i else slice(None)
-                for i in new_shape_residual]
+                         for i in new_shape_residual]
             arr = arr[new_slice]
         else:
             raise ValueError(m)
 
-    compression_pairs = [(d, c//d)
-        for d, c in zip(new_shape, arr.shape)]
+    compression_pairs = [
+        (d, c//d) for d, c in zip(new_shape, arr.shape)]
     flattened = [l for p in compression_pairs for l in p]
     arr = arr.reshape(flattened)
     axis_to_sum = (2*i + 1 for i in range(len(new_shape)))
@@ -56,13 +109,124 @@ def rebin(arr, binning, cut_to_bin=False, method=np.sum):
 
     return arr
 
-def chunks(l, n):
-    ''' Split list l in chunks of size n.
+def roll_nd(arr, shifts=None):
+    ''' Roll a n-D array along its axes.
 
-    http://stackoverflow.com/a/1751478/4352108
+    (A wrapper around np.roll, for n-D array.)
+
+    Parameters
+    ==========
+    arr : array_like
+        Input array.
+    shifts : tuple of ints or None (default: None)
+        Tuple containing, for each axis, the number of places by which elements
+        are shifted along this axes. If a value of this tuple is None, elements
+        of the corresponding axis are shifted by half the axis length.
+
+        If None, shift all axes by half their respective lengths.
+
+    Returns
+    =======
+    output : ndarray
+        Array with the same shape as the input array.
+
+    Example
+    =======
+    >>> a = np.arange(9).reshape((3,3))
+    >>> a
+    array([[0, 1, 2],
+           [3, 4, 5],
+           [6, 7, 8]])
+    >>> roll_2d(a, (1, 1))
+    array([[8, 6, 7],
+           [2, 0, 1],
+           [5, 3, 4]])
+
     '''
-    n = max(1, n)
-    return (l[i:i+n] for i in range(0, len(l), n))
+    if shifts is None:
+        shifts = np.array(arr.shape) // 2
+    for i, shift in enumerate(shifts):
+        if shift is None:
+            shift = arr.shape[i] // 2
+        arr = np.roll(arr, shift, axis=i)
+    return arr
+
+# NaN in arrays ---------------------------------------------------------------
+
+def add_nan_border(arr, size=1):
+    ''' Create a larger array containing the original array surrounded by nan
+
+    Parameters
+    ==========
+    array : ndarray
+    size : int (default: 1)
+        The size of the nan border. This border will be added at both ends of
+        each axis.
+
+    Returns
+    =======
+    new_array : ndarray
+        A new array of shape `array.shape + 2*size`
+    '''
+    shape = np.array(arr.shape)
+    new_arr = np.ones(shape + 2*size) * np.nan
+    slice_ = [slice(+size, -size)] * arr.ndim
+    new_arr[slice_] = arr
+    return new_arr
+
+def stack_arrays(arr_list, fill_value=np.nan):
+    ''' Stack arrays of different shapes in a larger array, where smaller
+    arrays are padded with a fill_value.
+
+    Parameters
+    ==========
+    arr_list : list of array-likes
+        A list of n-dimension arrays, that can have different shapes.
+    fill_value : float (default: np.nan)
+        Value with which smaller arrays are padded.
+
+    Returns
+    =======
+    new_arr : ndarray
+        A (n+1)-dimension array that has as many items as `arr_list` along its
+        first dimension, and the largest size found across all elements of
+        `arr_list` for all subsequent dimensions.
+
+    Example
+    =======
+    >>> a = np.full((2, 5), 1)
+    array([[1, 1, 1, 1, 1],
+           [1, 1, 1, 1, 1]])
+    >>> b = np.full((3, 2), 2)
+    array([[2, 2],
+           [2, 2],
+           [2, 2]])
+    >>> num.stack_arrays((a, b), fill_value=0)
+    array([[[1, 1, 1, 1, 1],
+	    [1, 1, 1, 1, 1],
+	    [0, 0, 0, 0, 0]],
+
+	   [[2, 2, 0, 0, 0],
+	    [2, 2, 0, 0, 0],
+	    [2, 2, 0, 0, 0]]])
+    '''
+
+    ndims = [arr.ndim for arr in arr_list]
+    if len(set(ndims)) != 1:
+        raise ValueError('Arrays must have the same number of dimensions')
+    shapes = np.array([arr.shape for arr in arr_list])
+    nitems = len(arr_list)
+    new_shape = [nitems, *np.max(shapes, axis=0)]
+
+    new_arr = np.full(new_shape, fill_value)
+
+    for i, arr in enumerate(arr_list):
+        slice_ = [i] + [slice(None, s) for s in arr.shape]
+        new_arr[tuple(slice_)] = arr
+
+    return new_arr
+
+# Affine transforms -----------------------------------------------------------
 
 def affine_transform(x, y, transform_matrix, center=(0, 0)):
     ''' Apply an affine transform to an array of coordinates.
@@ -125,16 +289,17 @@ def affine_transform(x, y, transform_matrix, center=(0, 0)):
 
     return transformed_x, transformed_y
 
+# Running stuff ---------------------------------------------------------------
+
 def running_average(arr, n):
     ''' Compute a non-weighted running average on arr, with a window of width
     2n+1 centered on each value:
 
     ret_i = \sum_{j=-n}^n arr_{i+j} / (2n+1)
     '''
-    N = len(arr)
-    cs = np.cumsum(arr)
+    cumsum = np.cumsum(arr)
     ret = arr.copy()
-    ret[n:N-n] = (cs[2*n:] - cs[:N-2*n]) / (2*n)
+    ret[n:len(arr)-n] = (cumsum[2*n:] - cumsum[:len(arr)-2*n]) / (2*n)
     return ret
 
 def running_median(arr, mask):
@@ -145,40 +310,40 @@ def running_median(arr, mask):
     mask : 1D array, smaller than arr and with 2n+1 elements
     '''
 
-    N = len(arr)
-    M = len(mask)
-    assert M % 2 == 1, 'mask must have an odd number of events'
+    n = len(arr)
+    m = len(mask)
+    assert m % 2 == 1, 'mask must have an odd number of events'
 
     full_mask = np.empty_like(arr)
     full_mask[:] = np.nan
-    full_mask[:M] = mask
+    full_mask[:m] = mask
 
     ret = np.empty_like(arr)
-    for x in range(N):
-        m = np.roll(full_mask, x - M // 2)
-        if x < M // 2:
-            m[- M // 2 + x + 1:] = np.nan
-        if N - x <= M // 2:
-            m[:M // 2 - N + x + 1] = np.nan
+    for x in range(n):
+        m = np.roll(full_mask, x - m // 2)
+        if x < m // 2:
+            m[- m // 2 + x + 1:] = np.nan
+        if n - x <= m // 2:
+            m[:m // 2 - n + x + 1] = np.nan
         ret[x] = np.nanmedian(arr * m)
 
     return ret
 
-def weighted_running_average(arr, wf, x=None):
+def weighted_running_average(arr, weight_func, x=None):
     ''' Compute a running average on arr, weighting the contribution of each
-    term with weight-function wf.
+    term with weight-function.
 
     Parameters
     ==========
     arr : np.ndarray(ndim=1)
         Array of values on which to compute the running average.
-    wf : function
+    weight_func : function
         A function which takes a distance as input, and returns a weight.
         Weights don't have to be normalised.
     x : np.ndarray or None (default: None)
         If x is an array, use it to compute the distances before they are
-        passed to wf. This allows to compute a running average on non-regularly
-        sampled data.
+        passed to weight_func. This allows to compute a running average on
+        non-regularly sampled data.
 
     Returns
     =======
@@ -189,18 +354,18 @@ def weighted_running_average(arr, wf, x=None):
         - when x is specified:
             $ret_i = \sum_{j=-n}^n arr_{i+j} × w(|x_i - x_{i+j}|) / (2n+1)$.
     '''
-    return weighted_running_function(arr, wf, np.mean, x=x)
+    return weighted_running_function(arr, weight_func, np.mean, x=x)
 
-def weighted_running_function(arr, wf, function, x=None):
+def weighted_running_function(arr, weight_func, function, x=None):
     ''' Apply a running function on arr, weighting the contribution of each
-    term with weight-function wf. This is used to compute running averages,
-    stds, medians, etc.
+    term with weight-function. This is used to compute running averages, stds,
+    medians, etc.
 
     Parameters
     ==========
     arr : np.ndarray(ndim=1)
         Array of values on which to compute the running average.
-    wf : function
+    weight_func : function
         A function which takes a distance as input, and returns a weight.
         Weights don't have to be normalised.
     function : np.ufunc
@@ -209,89 +374,35 @@ def weighted_running_function(arr, wf, function, x=None):
         array.
     x : np.ndarray or None (default: None)
         If x is an array, use it to compute the distances before they are
-        passed to wf. This allows to compute a running average on non-regularly
-        sampled data.
+        passed to weight_func. This allows to compute a running average on
+        non-regularly sampled data.
 
     Returns
     =======
     ret : np.array
         An array of the same shape as the input arr, to which `function` has
-        been applied after weighting the terms with wf.
+        been applied after weighting the terms with weight_func.
     '''
-    wf = np.vectorize(wf)
+    weight_func = np.vectorize(weight_func)
 
-    N = len(arr)
+    n = len(arr)
     if x is None:
-        x = np.arange(N)
+        x = np.arange(n)
 
-    distances = x.repeat(N).reshape(-1, N).T
+    distances = x.repeat(n).reshape(-1, n).T
     distances = np.abs(np.array([d - d[i] for i, d in enumerate(distances)]))
-    weights = wf(distances)
-    norm = N / weights.sum(axis=1).repeat(N).reshape(-1, N)
+    weights = weight_func(distances)
+    norm = n / weights.sum(axis=1).repeat(n).reshape(-1, n)
     weights *= norm
 
     ret = arr.copy()
-    ret = arr.repeat(N).reshape(-1, N).T
+    ret = arr.repeat(n).reshape(-1, n).T
     ret *= weights
     ret = function(ret, axis=1)
 
     return ret
 
-def datetime_average(a, b):
-    ''' Average function that is friendly with datetime formats that only
-    support substraction. '''
-    return a + (b - a) / 2
-
-def ma_delete(arr, obj, axis=None):
-    ''' Wrapper around np.delete to handle masked arrays. '''
-    if isinstance(arr, np.ma.MaskedArray):
-        return np.ma.array(
-            np.delete(arr.data, obj, axis=axis),
-            mask=np.delete(arr.mask, obj, axis=axis),
-            fill_value=arr.fill_value,
-            )
-    else:
-        return np.delete(arr, obj, axis=axis)
-
-def mask_nans(arr):
-    ''' Create a masked version of arr, where the nans are hidden
-    '''
-    return np.ma.array(arr, mask=np.isnan(arr))
-
-def add_nan_border(arr, size=1):
-    ''' Create a larger array containing the original array surrounded by nan
-
-    Parameters
-    ==========
-    array : ndarray
-    size : int (default: 1)
-        The size of the nan border. This border will be added at both ends of
-        each axis.
-
-    Returns
-    =======
-    new_array : ndarray
-        A new array of shape `array.shape + 2*size`
-    '''
-    shape = np.array(arr.shape)
-    new_arr = np.ones(shape + 2*size) * np.nan
-    sl = [slice(+size, -size)] * arr.ndim
-    new_arr[sl] = arr
-    return new_arr
-
-def rms(arr, axis=None):
-    ''' Compute root mean square of arr: sqrt(average(arr²)). '''
-    return np.sqrt(np.average(arr**2, axis=axis))
-
-def normalized_periodogram(x, y, f):
-    ''' Returns a normalized Lomb-Scargle periodogram.
-
-    Wrapper around scipy.signal.lombscargle.
-
-    This normalization is meaningful if len(x) is large enough.
-    '''
-    s = scipy.signal.lombscargle(x, y, f)
-    return np.sqrt(4 * s / len(x))
+# Interpolation ---------------------------------------------------------------
 
 def get_griddata_points(grid):
     ''' Retrieve points in mesh grid of coordinates, that are shaped for use
@@ -303,10 +414,10 @@ def get_griddata_points(grid):
         An array of shape (2, x_dim, y_dim) containing (x, y) coordinates.
         (This should work with more than 2D coordinates.)
     '''
-    if type(grid) in [list, tuple]:
+    if isinstance(grid, (list, tuple)):
         grid = np.array(grid)
-    points = np.array([grid[i].flatten()
-        for i in range(grid.shape[0])])
+    points = np.array([
+        grid[i].flatten() for i in range(grid.shape[0])])
     return points
 
 def friendly_griddata(points, values, new_points, **kwargs):
@@ -339,16 +450,16 @@ def friendly_griddata(points, values, new_points, **kwargs):
     new_values = new_values.reshape(*new_shape)
     return new_values
 
-def _interpolate_cube_worker(values, x, y, new_x, new_y, method):
+def _interpolate_cube_worker(values, coord, new_coord, method):
     ''' Worker to paralellize the projection of a cube slice. '''
-    points = np.stack((x, y)).reshape(2, -1).T
+    points = np.stack(coord).reshape(2, -1).T
     values = values.flatten()
-    new_points = np.stack((new_x, new_y)).reshape(2, -1).T
+    new_points = np.stack(new_coord).reshape(2, -1).T
     new_values = si.griddata(points, values, new_points, method=method)
-    new_values = new_values.reshape(*new_x.shape)
+    new_values = new_values.reshape(*new_coord[0].shape)
     return new_values
 
-def interpolate_cube(cube, x, y, new_x, new_y, method='linear', cores=None):
+def interpolate_cube(cube, coord, new_coord, method='linear', cores=None):
     ''' Transform time series of 2D data one coordinate system to another.
 
     The cube is cut in slices along its axis 0, and the interpolation is
@@ -360,11 +471,11 @@ def interpolate_cube(cube, x, y, new_x, new_y, method='linear', cores=None):
     ==========
     cube : np.ndarray
         A cube containing data on a (T, Y, X) grid.
-    x, y, new_x, new_y : np.ndarray
+    coord, new_coord: 2-tuples of np.ndarray
         3D arrays containing the coordinates values. Shape (nt, ny, nx).
-        - x, y correspond to the coordinates in the input cube.
-        - new_x, new_y correspond to the expected coordinates for the output
-          cube.
+        - coord (x, y) correspond to the coordinates in the input cube.
+        - new_coord (new_x, new_y) correspond to the expected coordinates for
+          the output cube.
         - there are no restrictions on the regularity of these arrays.
           Eg. the coordinates could be either helioprojective or heliographic
           coordinates.
@@ -380,19 +491,22 @@ def interpolate_cube(cube, x, y, new_x, new_y, method='linear', cores=None):
         A new cube, containing values interpolated at new_x, new_y positions.
     '''
 
+    x, y = coord
+    new_x, new_y = new_coord
+
     if cube.ndim == 2:
-        new_cube = _interpolate_cube_worker(cube, x, y, new_x, new_y, method)
+        new_cube = _interpolate_cube_worker(cube, coord, new_coord, method)
 
     else:
         if cores is not None:
-            p = mp.Pool(cores)
+            pool = mp.Pool(cores)
             try:
-                new_cube = p.starmap(
+                new_cube = pool.starmap(
                     _interpolate_cube_worker,
                     zip(cube, x, y, new_x, new_y, itertools.repeat(method)),
                     chunksize=1)
             finally:
-                p.terminate()
+                pool.terminate()
         else:
             new_cube = list(itertools.starmap(
                 _interpolate_cube_worker,
@@ -435,15 +549,14 @@ def replace_missing_values(arr, missing, inplace=False, deg=1):
         'arr and missing must have the same shape'
     assert not np.all(missing), \
         'at least one element must not be missing'
-    npx = len(arr)
 
     if not inplace:
         arr = arr.copy()
 
     x = np.arange(len(arr))
-    c = np.polyfit(x[~missing], arr[~missing], deg)
-    p = np.poly1d(c)
-    arr[missing] = p(x[missing])
+    poly_params = np.polyfit(x[~missing], arr[~missing], deg)
+    poly = np.poly1d(poly_params)
+    arr[missing] = poly(x[missing])
 
     return arr
 
@@ -462,10 +575,10 @@ def exterpolate_nans(arr, deg):
     assert arr.ndim == 1, msg.format(arr.ndim)
     nan_mask = np.isnan(arr)
     x = np.arange(len(arr))
-    c = np.polyfit(x[~nan_mask], arr[~nan_mask], deg)
-    p = np.poly1d(c)
+    poly_params = np.polyfit(x[~nan_mask], arr[~nan_mask], deg)
+    poly = np.poly1d(poly_params)
     arr = arr.copy()
-    arr[nan_mask] = p(x[nan_mask])
+    arr[nan_mask] = poly(x[nan_mask])
     return arr
 
 def exterpolate_nans_in_rows(arr, deg):
@@ -475,49 +588,30 @@ def exterpolate_nans_in_rows(arr, deg):
         arr[i] = exterpolate_nans(row, deg)
     return arr
 
-def almost_identical(arr, threshold, **kwargs):
-    ''' Reduce an array of almost identical values to a single one.
+# Misc ------------------------------------------------------------------------
 
-    Parameters
-    ==========
-    arr : np.ndarray
-        An array of almost identical values.
-    threshold : float
-        The maximum standard deviation that is tolerated for the values in arr.
-    **kwargs :
-        Passed to np.std and np.average. Can be used to reduce arr across a
-        choosen dimension.
+def recarray_to_dict(recarray, lower=False):
+    ''' Transform a 1-row recarray to a dictionnary.
 
-    Raises
-    ======
-    ValueError if the standard deviation of the values in arr exceedes the
-    specified threshold value
-
-    Returns
-    =======
-    average : float or np.ndarray
-        The average value of arr.
+    if lower, lower all keys
     '''
+    while recarray.dtype is np.dtype('O'):
+        recarray = recarray[0]
+    assert len(recarray) == 1, 'structure contains more than one row!'
+    array = dict(zip(recarray.dtype.names, recarray[0]))
+    if lower:
+        array = {k.lower(): v for k, v in array.items()}
+    return array
 
-    irregularity = np.std(arr, **kwargs)
-    if np.any(irregularity > threshold):
-        msg = 'Uneven array:\n'
-        irr_stats = [
-            ('irregularity:', irregularity),
-            ('irr. mean:', np.mean(irregularity)),
-            ('irr. std:', np.std(irregularity)),
-            ('irr. min:', np.min(irregularity)),
-            ('irr. max:', np.max(irregularity)),
-            ]
-        for title, value in irr_stats:
-            msg += '{} {}\n'.format(title, value)
-        msg += 'array percentiles:\n'
-        percentiles = [0, 1, 25, 50, 75, 99, 100]
-        for p in percentiles:
-            msg += '{: 5d}: {:.2f}\n'.format(p, np.percentile(arr, p))
-        raise ValueError(msg)
-
-    return np.average(arr, **kwargs)
+def ma_delete(arr, obj, axis=None):
+    ''' Wrapper around np.delete to handle masked arrays. '''
+    if isinstance(arr, np.ma.MaskedArray):
+        return np.ma.array(
+            np.delete(arr.data, obj, axis=axis),
+            mask=np.delete(arr.mask, obj, axis=axis),
+            fill_value=arr.fill_value,
+            )
+    return np.delete(arr, obj, axis=axis)
 
 def get_max_location(arr, sub_px=True):
     ''' Get the location of the max of an array.
@@ -535,6 +629,8 @@ def get_max_location(arr, sub_px=True):
         Coordinates of the maximum of the input array.
     '''
     maxcc = np.nanmax(arr)
+    if np.isnan(maxcc):
+        return np.array([np.nan] * arr.ndim)
     max_px = np.where(arr == maxcc)
     if not np.all([len(m) == 1 for m in max_px]):
         warnings.warn('could not find a unique maximum', RuntimeWarning)
@@ -546,13 +642,13 @@ def get_max_location(arr, sub_px=True):
         for dim in range(arr.ndim):
             arr_slice = list(max_px)
             dim_max = max_px[dim]
-            if dim_max == 0 or dim_max == arr.shape[dim] - 1:
+            if dim_max in (0, arr.shape[dim] - 1):
                 m = 'maximum is on the edge of axis {}'.format(dim)
                 warnings.warn(m, RuntimeWarning)
                 max_loc[dim] = dim_max
             else:
                 arr_slice[dim] = [dim_max-1, dim_max, (dim_max+1)]
-                interp_points = arr[arr_slice]
+                interp_points = arr[tuple(arr_slice)]
                 a, b, c = interp_points**2
                 d = a - 2*b + c
                 if d != 0 and not np.isnan(d):
@@ -560,32 +656,38 @@ def get_max_location(arr, sub_px=True):
 
     return max_loc
 
-@np.vectorize
-def total_seconds(timedelta):
-    return timedelta.total_seconds()
+def clip_to_nan(arr, t_low=None, t_high=None):
+    ''' Replace the values in `arr` that are below `t_low` or above `t_high`
+    with np.nan.
 
-@np.vectorize
-def parse_date(date):
-    return dateutil.parser.parse(date)
+    Input
+    =====
+    arr : np.ndarray
+        The array to clip.
+    t_low : float
+        The lower threshold. If None, use no lower limit.
+    t_high : float
+        The higher threshold. If None, use no higher limit.
 
-def seconds_to_timedelta(arr):
-    ''' Parse an array of seconds and convert it to timedelta.
+    Returns
+    =======
+    A np.ndarray of the same dimension as `arr`, where values below `t_low`
+    or above `t_high` are set to `np.nan`.
+
+    Note
+    ====
+    Will raise `ValueError` if `arr` contains integers, since `np.nan` cannot be
+    converted to `int`.
+
     '''
-    to_timedelta = np.vectorize(lambda s: datetime.timedelta(seconds=s))
-    mask = ~np.isnan(arr)
-    td = arr.astype(object)
-    td[mask] = to_timedelta(td[mask])
-    return td
-
-def recarray_to_dict(recarray, lower=False):
-    ''' Transform a 1-row recarray to a dictionnary.
-
-    if lower, lower all keys
-    '''
-    while recarray.dtype is np.dtype('O'):
-        recarray = recarray[0]
-    assert len(recarray) == 1, 'structure contains more than one row!'
-    array = dict(zip(recarray.dtype.names, recarray[0]))
-    if lower:
-        array = {k.lower(): v for k, v in array.items()}
-    return array
+    # create mask
+    mask = np.zeros_like(arr, dtype=bool)
+    if t_low:
+        mask |= arr < t_low
+    if t_high:
+        mask |= arr > t_high
+    # mask array
+    arr = np.ma.array(arr, mask=mask)
+    # fill with np.nan
+    arr = arr.filled(fill_value=np.nan)
+    return arr
