@@ -3,6 +3,7 @@
 import numpy as np
 
 import matplotlib as mpl
+from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 # Plot ------------------------------------------------------------------------
 
@@ -304,7 +305,7 @@ def auto_lim_cube(data, x=None, y=None, threshold=0.9):
     displayed_pixels = (coverage > (1 - threshold))
     return auto_lim(displayed_pixels, x, y)
 
-# Cmap ------------------------------------------------------------------------
+# Cmap and colorbar -----------------------------------------------------------
 
 def get_extend(data, **kwargs):
     ''' Get the extent to pass to plt.colorbar()
@@ -327,6 +328,47 @@ def get_extend(data, **kwargs):
     if extend_min and extend_max:
         extend = 'both'
     return extend
+
+def colorbar(ax, mappable, position, size='10%', pad=0.5,
+                       aspect=1/30, **kwargs):
+    ''' Add a colorbar to axes, ensuring that both are the same size
+
+    The cbar axis is divided with mpl_toolkits.axes_grid1.make_axes_locatable
+    to create new axes (cax) where the colorbar is put.
+
+    Parameters
+    ==========
+    ax : matplotlib axes
+    mappable : matplotlib mappable passed to colorbar
+    position : str
+        The position of the colorbar relatively to ax.
+        'left', 'right', 'top', or 'bottom'.
+    size : str
+        The size of the color bar axes, in percent of the input ax.
+    pad : float
+        The padding between the ax and cax.
+    aspect : float
+        The aspect ratio of the cax. Should always be smaller than 1.
+    **kwargs :
+        Passed to cax.colorbar()
+
+    Returns
+    =======
+    cb : matplotlib.colorbar.Colorbar
+        The newly created colorbar
+    '''
+    axes_divider = make_axes_locatable(ax)
+    cax = axes_divider.append_axes(position, size=size, pad=pad)
+    default_orientations = dict(left='vertical', right='vertical',
+                                top='horizontal', bottom='horizontal')
+    orientation = kwargs.pop('orientation', default_orientations[position])
+    cb = ax.figure.colorbar(cax=cax, mappable=mappable,
+                            orientation=orientation, **kwargs)
+    if orientation == 'vertical':
+        cax.set_aspect(1 / aspect)
+    else:
+        cax.set_aspect(aspect)
+    return cb
 
 # Map -------------------------------------------------------------------------
 
