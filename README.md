@@ -7,7 +7,7 @@ Small additions to Python that may make your life easier.
 Clone the repository (or download the sources), and install with pip:
 
 ~~~
-git clone https://github.com/ArcturusB/papy
+git clone https://github.com/gpelouze/papy
 cd papy
 pip install .
 ~~~
