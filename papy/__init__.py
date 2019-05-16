@@ -1,3 +1,3 @@
 name = 'papy'
 
-from . import freq, img, num, plot, time, misc
+from . import freq, img, num, plot, time, misc, sol
