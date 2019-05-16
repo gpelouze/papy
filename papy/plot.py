@@ -533,7 +533,7 @@ def plot_pixel_contour(ax, mask, *args, coordinates=None, **kwargs):
     seg_x = xmin + x_step * (seg_x - .5)
     seg_y = ymin + y_step * (seg_y - .5)
 
-    ax.plot(seg_x, seg_y, *args, **kwargs)
+    return ax.plot(seg_x, seg_y, *args, **kwargs)
 
 
 # 2D histograms ---------------------------------------------------------------
