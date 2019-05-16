@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import functools
 import time
 
 class Chrono():
@@ -16,3 +17,7 @@ class Chrono():
         msg = msg.format(now - self.t, now - self.t0)
         print(msg)
         self.t = now
+
+def cached_property(func):
+    ''' Decorator composition of @property with @functools.lru_cache() '''
+    return property(functools.lru_cache()(func))
