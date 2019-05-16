@@ -484,6 +484,9 @@ def plot_pixel_contour(ax, mask, *args, coordinates=None, **kwargs):
     inspired from https://stackoverflow.com/a/24540564/4352108
     '''
 
+    if not np.any(mask):
+        return
+
     # Fallback to color from prop_cycler if it isn't defined by user:
     try:
         color_in_args = False
