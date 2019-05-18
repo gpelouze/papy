@@ -3,6 +3,7 @@
 from datetime import timedelta
 import warnings
 
+from astropy.io import fits
 from astropy.time import Time
 import numpy as np
 from numpy import sin, cos, tan, sqrt, arcsin, arctan
@@ -263,6 +264,35 @@ class ObserverEarth(Observer):
         self.Phi0 = 0 # by definition of the Stonyhurst coordinates
         self.B0 = ang.deg2rad(self.ephemeris[11])
         self.D0 = self.ephemeris[0] * 149597870700 # au to m
+
+class ObserverFITS(Observer):
+    ''' Observer object loaded from FITS header data. '''
+    def __init__(self, fits_path, hdu=0,
+                 keywords=dict(date_obs='DATE-OBS', hglt_obs='HGLT_OBS',
+                               hgln_obs='HGLN_OBS', dsun_obs='DSUN_OBS')):
+        '''
+        Parameters
+        ==========
+        fits_path :
+            The path to a FITS file which header contains:
+            - date_obs : the observation date (in any format understood by
+              astropy.time.Time()),
+            - hglt_obs, hgln_obs : the Stonyhurst coordinates of the observer
+              (in degrees),
+            - dsun_obs : the distance from the observer to the Sun (in meters).
+            (Also see 'keywords' kwarg.)
+        hdu : int (default: 0)
+            The index of the HDU from which to take the header.
+        keywords : dict
+            The FITS header keywords for the four above parameters.
+            Default values correspond to those used in the AIA level 1 FITS
+            headers.
+        '''
+        header = fits.open(fits_path)[hdu].header
+        super().__init__(header[keywords['date_obs']])
+        self.B0 = ang.deg2rad(header[keywords['hglt_obs']])
+        self.Phi0 = ang.deg2rad(header[keywords['hgln_obs']])
+        self.D0 = header[keywords['dsun_obs']]
 
 # Misc. =======================================================================
 
