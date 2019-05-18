@@ -359,7 +359,7 @@ def diff_rot(lat, wvl='default'):
     return corr
 
 def R0_to_m(R0):
-    R_sun = 695508000 # m
+    R_sun = 695700000 # m
     return R_sun * R0
 
 def default_r(r, R0):
