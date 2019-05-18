@@ -422,9 +422,9 @@ def stonyhurst_to_heeq(lon_hg, lat, r, R0=1):
         The heliocentric earth equatorial coordinates, in meters.
     '''
     r = default_r(r, R0)
-    Xheeq = r * cos(lat_hq) * cos(lon_hq)
-    Yheeq = r * cos(lat_hq) * sin(lon_hq)
-    Zheeq = r * sin(lat_hq)
+    Xheeq = r * cos(lat) * cos(lon_hg)
+    Yheeq = r * cos(lat) * sin(lon_hg)
+    Zheeq = r * sin(lat)
     return Xheeq, Yheeq, Zheeq
 
 
