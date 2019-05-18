@@ -719,7 +719,7 @@ def helioprojective_to_heeq(Tx, Ty, d, observer):
 
 # Compatibility ===============================================================
 
-def car_to_hp_earth(lon, lat, dateobs, R0=1.,
+def car_to_hp_earth(lon, lat, dateobs, R=1.,
         occultation=False, diff_rot_ref=None):
     ''' Convert Heliographic Carrington coordinates to Helioprojective
     coordinates for an observer on Earth.
@@ -760,7 +760,7 @@ def car_to_hp_earth(lon, lat, dateobs, R0=1.,
     Ty = ang.rad2arcsec(Ty)
     return Tx, Ty, dateobs
 
-def hp_to_car_earth(Tx, Ty, dateobs, R0=1., diff_rot_ref=None):
+def hp_to_car_earth(Tx, Ty, dateobs, R=1., diff_rot_ref=None):
     ''' Convert Helioprojective cartesian to Heliographic Carrington
     coordinates for an observer on Earth.
 
