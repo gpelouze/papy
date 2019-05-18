@@ -58,7 +58,7 @@ def total_seconds(timedelta):
 
 # Observer location ===========================================================
 
-def get_sun_geocentric(dateobs, print_list=False):
+def get_sun_geocentric(dateobs, print_list=False, standard_units=False):
     ''' Provide geocentric physical ephemeris of the Sun. (Adapted from Solar
     Soft's get_sun function.)
 
@@ -69,24 +69,31 @@ def get_sun_geocentric(dateobs, print_list=False):
         If no time scale is specified, it is assumed to be UTC.
     print_list : bool (default: False)
         Print the ephemeris before returning it.
+    standard_units : bool (default: False)
+        If True, convert all returned angle values to radians, and all lengths
+        to meters.
 
     Returns
     =======
     data : vector of solar ephemeris data:
         - Distance (AU)
-        - Semidiameter of disk (sec)
+        - Semi-diameter of disk (arcsec)
         - True longitude (deg)
         - True latitude (0 always)
         - Apparent longitude (deg)
         - Apparent latitude (0 always)
-        - True RA (hours)
+        - True RA (hour angle)
         - True Dec (deg)
-        - Apparent RA (hours)
+        - Apparent RA (hour angle)
         - Apparent Dec (deg)
         - Longitude at center of disk (deg)
         - Latitude at center of disk (deg)
         - Position angle of rotation axis (deg)
-        - decimal carrington rotation number
+        - decimal Carrington rotation number
+
+        If standard_units=True, all angles are converted to radians (be they in
+        arcsec, degrees, or hour angles), and all lengths are converted to
+        meters.
 
     Notes
     =====
@@ -231,6 +238,25 @@ def get_sun_geocentric(dateobs, print_list=False):
         msg = msg.format(**locals())
         print(msg)
 
+    if standard_units:
+        dist *= 149597870700
+        # convert all angles to radians
+        degra = np.pi / 180
+        arcsra = degra / 3600
+        hra = np.pi / 12
+        sd *= degra
+        true_long *= degra
+        true_lat *= degra
+        app_long *= degra
+        app_lat *= degra
+        true_ra *= hra
+        true_dec *= degra
+        app_ra *= hra
+        app_dec *= degra
+        he_lon *= degra
+        he_lat *= degra
+        pa *= degra
+
     data = np.stack((dist,sd,true_long,true_lat,app_long,app_lat,
         true_ra,true_dec,app_ra,app_dec,he_lon,he_lat, pa,carr))
 
@@ -249,7 +275,7 @@ class Observer():
         '''
         self.date_obs = Time(date_obs)
         ''' Carrington longitude of the central meridian as seen from Earth '''
-        self.L0 = ang.deg2rad(get_sun_geocentric(self.date_obs)[10])
+        self.L0 = get_sun_geocentric(self.date_obs, standard_units=True)[10]
         ''' Stonyhurst longitude of the observer '''
         self.Phi0 = None
         ''' Stonyhurst latitude of the observer '''
@@ -260,10 +286,10 @@ class Observer():
 class ObserverEarth(Observer):
     def __init__(self, date_obs):
         super().__init__(date_obs)
-        self.ephemeris = get_sun_geocentric(self.date_obs)
+        self.ephemeris = get_sun_geocentric(self.date_obs, standard_units=True)
         self.Phi0 = 0 # by definition of the Stonyhurst coordinates
-        self.B0 = ang.deg2rad(self.ephemeris[11])
-        self.D0 = self.ephemeris[0] * 149597870700 # au to m
+        self.B0 = self.ephemeris[11]
+        self.D0 = self.ephemeris[0]
 
 class ObserverFITS(Observer):
     ''' Observer object loaded from FITS header data. '''
@@ -290,8 +316,8 @@ class ObserverFITS(Observer):
         '''
         header = fits.open(fits_path)[hdu].header
         super().__init__(header[keywords['date_obs']])
-        self.B0 = ang.deg2rad(header[keywords['hglt_obs']])
-        self.Phi0 = ang.deg2rad(header[keywords['hgln_obs']])
+        self.B0 = header[keywords['hglt_obs']]
+        self.Phi0 = header[keywords['hgln_obs']]
         self.D0 = header[keywords['dsun_obs']]
 
 # Misc. =======================================================================
@@ -331,7 +357,7 @@ def diff_rot(lat, wvl='default'):
     return corr
 
 def R0_to_m(R0):
-    R_sun = 695508000 # m # old
+    R_sun = 695508000 # m
     return R_sun * R0
 
 def default_r(r, R0):
@@ -346,12 +372,8 @@ def default_r(r, R0):
 
 # Units assumptions:
 # lengths in meters
-# heliographic angles in degrees
-# helioprojective angles in radians
+# angles in radians
 #
-# Functions are responsible for **only** accepting and returning values in
-# these units.
-
 # helioprojective d and heliographic (Stonyhurst or Carrington) r may be
 # undefined, because these coordinates system often come projected.
 # Functions that convert from these systems handle None values for d or r.
@@ -367,13 +389,11 @@ def heeq_to_stonyhurst(Xheeq, Yheeq, Zheeq):
     ==========
     Xheeq, Yheeq, Zheeq : float
         The heliocentric earth equatorial coordinates, in meters.
-    observer : Observer
-        Object that gives the position of the observer relative to the Sun.
 
     Returns
     =======
     lon_hg, lat : float
-        The heliographic Stonyhurst longitude and latitude, in degrees.
+        The heliographic Stonyhurst longitude and latitude, in radians.
     r : float
         The radius coordinate, in meters.
     '''
@@ -390,10 +410,11 @@ def stonyhurst_to_heeq(lon_hg, lat, r, R0=1):
     ==========
     lon_hg, lat : float
         The heliographic Stonyhurst longitude and latitude, in degrees.
-    r : float
+    r : float or None
         The radius coordinate, in meters.
-    observer : Observer
-        Object that gives the position of the observer relative to the Sun.
+    R0 : float (default: 1)
+        Radius of the projection sphere which is used if r is None, in solar
+        radii.
 
     Returns
     =======
@@ -414,7 +435,7 @@ def carrington_to_stonyhurst(lon_car, lat, r, observer):
     Parameters
     ==========
     lon_car, lat : float
-        The heliographic Carrington longitude and latitude, in degrees.
+        The heliographic Carrington longitude and latitude, in radians.
     r : float
         The radius coordinate, in meters.
     observer : Observer
@@ -423,13 +444,13 @@ def carrington_to_stonyhurst(lon_car, lat, r, observer):
     Returns
     =======
     lon_hg, lat : float
-        The heliographic Stonyhurst longitude and latitude, in degrees.
+        The heliographic Stonyhurst longitude and latitude, in radians.
     r : float
         The radius coordinate, in meters.
 
     **Note that only lon_hg is changed.**
     '''
-    lon_hg = lon_car - ang.rad2deg(observer.L0)
+    lon_hg = lon_car - observer.L0
     return lon_hg, lat, r
 
 def stonyhurst_to_carington(lon_hg, lat, r, observer):
@@ -439,7 +460,7 @@ def stonyhurst_to_carington(lon_hg, lat, r, observer):
     Parameters
     ==========
     lon_hg, lat : float
-        The heliographic Stonyhurst longitude and latitude, in degrees.
+        The heliographic Stonyhurst longitude and latitude, in radians.
     r : float
         The radius coordinate, in meters.
     observer : Observer
@@ -448,13 +469,13 @@ def stonyhurst_to_carington(lon_hg, lat, r, observer):
     Returns
     =======
     lon_car, lat : float
-        The heliographic Carrington longitude and latitude, in degrees.
+        The heliographic Carrington longitude and latitude, in radians.
     r : float
         The radius coordinate, in meters.
 
     **Note that only lon_car is changed.**
     '''
-    lon_car = lon_hg + ang.rad2deg(observer.L0)
+    lon_car = lon_hg + observer.L0
     return lon_car, lat, r
 
 
@@ -465,11 +486,14 @@ def stonyhurst_to_heliocentric(lon_hg, lat, r, observer, R0=1):
     Parameters
     ==========
     lon_hg, lat : float
-        The heliographic Stonyhurst longitude and latitude, in degrees.
-    r : float
+        The heliographic Stonyhurst longitude and latitude, in radians.
+    r : float or None
         The radius coordinate, in meters.
     observer : Observer
         Object that gives the position of the observer relative to the Sun.
+    R0 : float (default: 1)
+        Radius of the projection sphere which is used if r is None, in solar
+        radii.
 
     Returns
     =======
@@ -477,8 +501,6 @@ def stonyhurst_to_heliocentric(lon_hg, lat, r, observer, R0=1):
         The heliocentric cartesian coordinates, in meters.
     '''
     r = default_r(r, R0)
-    lon_hg = ang.deg2rad(lon_hg)
-    lat = ang.deg2rad(lat)
     x = r * cos(lat) * sin(lon_hg - observer.Phi0)
     y = r * (sin(lat) * cos(observer.B0) - cos(lat) * cos(lon_hg - observer.Phi0) * sin(observer.B0))
     z = r * (sin(lat) * sin(observer.B0) + cos(lat) * cos(lon_hg - observer.Phi0) * cos(observer.B0))
@@ -498,15 +520,13 @@ def heliocentric_to_stonyhurst(x, y, z, observer):
     Returns
     =======
     lon_hg, lat : float
-        The heliographic Stonyhurst longitude and latitude, in degrees.
+        The heliographic Stonyhurst longitude and latitude, in radians.
     r : float
         The radius coordinate, in meters.
     '''
     r = np.sqrt(x**2 + y**2 + z**2)
     lat = arcsin((y * cos(observer.B0) + z * sin(observer.B0)) / r)
     lon_hg = observer.Phi0 + arg(z * cos(observer.B0) - y * sin(observer.B0), x)
-    lat = ang.rad2deg(lat)
-    lon_hg = ang.rad2deg(lon_hg)
     return lon_hg, lat, r
 
 
@@ -522,14 +542,15 @@ def helioprojective_to_heliocentric(Tx, Ty, d, observer, R0=1):
         The distance to the point from the observer, in meters.
     observer : Observer
         Object that gives the position of the observer relative to the Sun.
+    R0 : float (default: 1)
+        Radius of the projection sphere which is used if d is None, in solar
+        radii.
 
     Returns
     =======
     x, y, z : float
         The heliocentric cartesian coordinates, in meters.
     '''
-    Tx = ang.arcsec2rad(Tx)
-    Ty = ang.arcsec2rad(Ty)
     if d is None:
         d = observer.D0
         default_d = True
@@ -558,14 +579,12 @@ def heliocentric_to_helioprojective(x, y, z, observer):
     =======
     Tx, Ty : float
         The helioprojective cartesian coordinates, in arcsec.
-    d : float or None
+    d : float
         The distance to the point from the observer, in meters.
     '''
     d = np.sqrt(x**2 + y**2 + (observer.D0 - z)**2)
     Tx = arg(observer.D0 - z, x)
     Ty = arcsin(y / d)
-    Tx = ang.rad2arcsec(Tx)
-    Ty = ang.rad2arcsec(Ty)
     return Tx, Ty, d
 
 # composed functions ----------------------------------------------------------
@@ -578,14 +597,14 @@ def carrington_to_helioprojective(lon_car, lat, r, observer, R0=1,
     Parameters
     ==========
     lon_car, lat : float
-        The heliographic Carrington longitude and latitude, in degrees.
-    r : float
+        The heliographic Carrington longitude and latitude, in radians.
+    r : float or None
         The radius coordinate, in meters.
     observer : Observer
         Object that gives the position of the observer relative to the Sun.
-    R : float (default: 1.)
-        The size of the default projection sphere (used if d is None), in solar
-        radius.
+    R0 : float (default: 1)
+        Radius of the projection sphere which is used if r is None, in solar
+        radii.
     diff_rot_ref : datetime.datetime or None (default: None)
         If not None, correct for differential rotation, using this reference
         date.
@@ -596,7 +615,7 @@ def carrington_to_helioprojective(lon_car, lat, r, observer, R0=1,
     =======
     Tx, Ty : float
         The helioprojective cartesian coordinates, in arcsec.
-    d : float or None
+    d : float
         The distance to the point from the observer, in meters.
     '''
 
@@ -628,9 +647,9 @@ def helioprojective_to_carrington(Tx, Ty, d, observer, R0=1, diff_rot_ref=None):
         The distance to the point from the observer, in meters.
     observer : Observer
         Object that gives the position of the observer relative to the Sun.
-    R : float (default: 1.)
-        The size of the default projection sphere (used if d is None), in solar
-        radius.
+    R0 : float (default: 1)
+        Radius of the projection sphere which is used if d is None, in solar
+        radii.
     diff_rot_ref : datetime.datetime or None (default: None)
         If not None, correct for differential rotation, using this reference
         date.
@@ -638,7 +657,7 @@ def helioprojective_to_carrington(Tx, Ty, d, observer, R0=1, diff_rot_ref=None):
     Returns
     =======
     lon_car, lat : float
-        The heliographic Carrington longitude and latitude, in degrees.
+        The heliographic Carrington longitude and latitude, in radians.
     r : float
         The radius coordinate, in meters.
     '''
@@ -683,12 +702,16 @@ def car_to_hp_earth(lon, lat, dateobs, R0=1.,
     dateobs : datetime.datetime
     '''
     warnings.warn('deprecated, use car_to_hp instead', DeprecationWarning)
+    lon = ang.deg2rad(lon)
+    lat = ang.deg2rad(lat)
     observer = ObserverEarth(dateobs)
     Tx, Ty, _ = carrington_to_helioprojective(
         lon, lat, None,
         ObserverEarth(dateobs),
         R0=R0,
         diff_rot_ref=diff_rot_ref)
+    Tx = ang.rad2arcsec(Tx)
+    Ty = ang.rad2arcsec(Ty)
     return Tx, Ty, dateobs
 
 def hp_to_car_earth(Tx, Ty, dateobs, R0=1., diff_rot_ref=None):
@@ -717,11 +740,15 @@ def hp_to_car_earth(Tx, Ty, dateobs, R0=1., diff_rot_ref=None):
     dateobs : datetime.datetime
     '''
     warnings.warn('deprecated, use hp_to_car instead', DeprecationWarning)
+    Tx = ang.arcsec2rad(Tx)
+    Ty = ang.arcsec2rad(Ty)
     lon, lat, _ = helioprojective_to_carrington(
         Tx, Ty, None,
         ObserverEarth(dateobs),
         R0=R0,
         diff_rot_ref=diff_rot_ref)
+    lon = ang.rad2deg(lon)
+    lat = ang.rad2deg(lat)
     return lon, lat, dateobs
 
 
