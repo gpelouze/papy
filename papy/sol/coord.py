@@ -671,6 +671,50 @@ def helioprojective_to_carrington(Tx, Ty, d, observer, R0=1, diff_rot_ref=None):
     return lon_car, lat, r
 
 
+def heeq_to_helioprojective(Xheeq, Yheeq, Zheeq, observer):
+    ''' Convert heliocentric earth equatorial (HEEQ) to helioprojective
+
+    Parameters
+    ==========
+    Xheeq, Yheeq, Zheeq : float
+        The heliocentric earth equatorial coordinates, in meters.
+    observer : Observer
+        Object that gives the position of the observer relative to the Sun.
+
+    Returns
+    =======
+    Tx, Ty : float
+        The helioprojective cartesian coordinates, in arcsec.
+    d : float
+        The distance to the point from the observer, in meters.
+    '''
+    lon_hg, lat, r = heeq_to_stonyhurst(Xheeq, Yheeq, Zheeq)
+    x, y, z = stonyhurst_to_heliocentric(lon_hg, lat, r, observer)
+    Tx, Ty, d = heliocentric_to_helioprojective(x, y, z, observer)
+    return Tx, Ty, d
+
+def helioprojective_to_heeq(Tx, Ty, d, observer):
+    ''' Convert helioprojective to heliocentric earth equatorial (HEEQ)
+
+    Parameters
+    ==========
+    Tx, Ty : float
+        The helioprojective cartesian coordinates, in arcsec.
+    d : float
+        The distance to the point from the observer, in meters.
+    observer : Observer
+        Object that gives the position of the observer relative to the Sun.
+
+    Returns
+    =======
+    Xheeq, Yheeq, Zheeq : float
+        The heliocentric earth equatorial coordinates, in meters.
+    '''
+    x, y, z = helioprojective_to_heliocentric(Tx, Ty, d, observer)
+    lon_hg, lat, r = heliocentric_to_stonyhurst(x, y, z, observer)
+    Xheeq, Yheeq, Zheeq = stonyhurst_to_heeq(lon_hg, lat, r)
+    return Xheeq, Yheeq, Zheeq
+
 # Compatibility ===============================================================
 
 def car_to_hp_earth(lon, lat, dateobs, R0=1.,
