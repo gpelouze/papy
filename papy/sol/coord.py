@@ -247,41 +247,22 @@ class Observer():
             If no time scale is specified, it is assumed to be UTC.
         '''
         self.date_obs = Time(date_obs)
-        # Carrington longitude of the central meridian as seen from Earth:
+        ''' Carrington longitude of the central meridian as seen from Earth '''
         self.L0 = ang.deg2rad(get_sun_geocentric(self.date_obs)[10])
-
-    @property
-    def Phi0(self):
         ''' Stonyhurst longitude of the observer '''
-        pass
-
-    @property
-    def B0(self):
+        self.Phi0 = None
         ''' Stonyhurst latitude of the observer '''
-        pass
-
-    @property
-    def D0(self):
+        self.B0 = None
         ''' Distance between the Sun center and the observer '''
-        pass
+        self.D0 = None
 
 class ObserverEarth(Observer):
     def __init__(self, date_obs):
         super().__init__(date_obs)
         self.ephemeris = get_sun_geocentric(self.date_obs)
-
-    @property
-    def Phi0(self):
-        return 0 # by definition of the Stonyhurst coordinates
-
-    @property
-    def B0(self):
-        return ang.deg2rad(self.ephemeris[11])
-
-    @property
-    def D0(self):
-        return self.ephemeris[0] * 149597870700 # au to m
-
+        self.Phi0 = 0 # by definition of the Stonyhurst coordinates
+        self.B0 = ang.deg2rad(self.ephemeris[11])
+        self.D0 = self.ephemeris[0] * 149597870700 # au to m
 
 # Misc. =======================================================================
 
