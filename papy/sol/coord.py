@@ -316,8 +316,8 @@ class ObserverFITS(Observer):
         '''
         header = fits.open(fits_path)[hdu].header
         super().__init__(header[keywords['date_obs']])
-        self.B0 = header[keywords['hglt_obs']]
-        self.Phi0 = header[keywords['hgln_obs']]
+        self.B0 = ang.deg2rad(header[keywords['hglt_obs']])
+        self.Phi0 = ang.deg2rad(header[keywords['hgln_obs']])
         self.D0 = header[keywords['dsun_obs']]
 
 # Misc. =======================================================================
