@@ -286,7 +286,9 @@ class Observer():
 class ObserverEarth(Observer):
     def __init__(self, date_obs):
         super().__init__(date_obs)
+        self.date_obs = Time(date_obs)
         self.ephemeris = get_sun_geocentric(self.date_obs, standard_units=True)
+        self.L0 = self.ephemeris[10]
         self.Phi0 = 0 # by definition of the Stonyhurst coordinates
         self.B0 = self.ephemeris[11]
         self.D0 = self.ephemeris[0]
