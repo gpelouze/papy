@@ -14,6 +14,115 @@ except ImportError:
     warnings.warn('Could not import tqdm.')
     tqdm = lambda x: x
 
+# FFT =========================================================================
+
+def resample_series(x, arr, dx=None):
+    ''' Resample a series of values so that it is regalurly sampled in x
+
+    Parameters
+    ==========
+    x : array of shape (n, )
+        x coordinates, not not necessarily regularly sampled
+    arr : array of shape (n, )
+        Values at each point of coordinate x
+    dx : float or None (default: None)
+        Target x sampling step
+        If None, use 2× the median step of x
+
+    Returns
+    =======
+    new_x : array of shape (m, )
+        new x coordinates, regularly sampled with step dx
+    new_y : array of shape (m, )
+        values interpolated at the new x positions
+    '''
+    if dx is None:
+        dx = np.median(x[1:] - x[:-1]) / 2
+    new_x = np.arange(x[0], x[-1], dx)
+    new_arr = np.interp(new_x, x, arr)
+    return new_x, new_arr
+
+def apod_sin(arr, frac=0.05, in_place=False):
+    ''' Apodize an array with sinusoids
+
+    Parameters
+    ==========
+    arr : array of shape (n,)
+        The array to apodize.
+    frac : float
+        Size of the apodized regions at the start and end of the array,
+        as a fraction of the array length.
+    in_place : bool (default: False)
+        If True, perform the apodization in place, else copy the array.
+
+    Given nw = frac*n, the first nw items of arr are multiplied by:
+
+        sin(pi/2 range(nw)/nw)
+
+    and the last nw items are multiplied by:
+
+        cos(pi/2 range(nw)/nw)
+
+    In addition, the values are shifted by their average within the start and
+    end windows before they are multiplied by the sin/cos functions, and
+    shifted back after the multiplication.
+
+    Returns
+    =======
+    apod_arr : array of shape (n,)
+        Apodized array.
+    '''
+    if in_place:
+        apod_arr = arr
+    else:
+        apod_arr = arr.copy()
+
+    n_window = round(arr.size*frac)
+    start = slice(None, n_window)
+    end = slice(-n_window, None)
+    avg = np.mean([arr[start], arr[end]])
+
+    window = np.sin(0.5*np.pi * np.arange(n_window) / n_window)
+    apod_arr[start] = window * (apod_arr[start] - avg) + avg
+    window = np.cos(0.5*np.pi * np.arange(n_window) / n_window)
+    apod_arr[end] = window  * (apod_arr[end] - avg) + avg
+
+    return apod_arr
+
+def normalized_psd(arr, sampling=1, real=False):
+    ''' Compute the normalized power spectral density (PSD).
+
+    This function uses np.fft.fft in order to compute the Fourier transform,
+    and applies the correct normalisations in order to get the PSD.
+
+    Parameters
+    ==========
+    arr : array of shape (n,)
+        Input array.
+        The values will be shifted so that their average is 0.
+    sampling : float (default: 1)
+        Spacing of the points in arr.
+    real : bool (default: False)
+        If True, use np.fft.rfft instead of np.fft.fft.
+
+    Returns
+    =======
+    power : array of shape (n/2,)
+        The PSD, in \sigma**2
+    '''
+    arr = arr - np.mean(arr)
+    if real:
+        freq = np.fft.rfftfreq(arr.size, d=sampling)
+        ft = np.fft.rfft(arr, norm='ortho')
+        psdt = np.abs(ft)**2 / np.std(arr)**2
+    else:
+        freq = np.fft.fftfreq(arr.size, d=sampling)
+        ft = np.fft.fft(arr, norm='ortho')
+        psdt = ft*np.conj(ft) / np.std(arr)**2
+    return freq, psdt
+
+# Periodograms ================================================================
+
 def normalized_periodogram(x, y, angular_freqs):
     ''' Returns a normalized Lomb-Scargle periodogram.
 
