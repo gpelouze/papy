@@ -89,7 +89,7 @@ def apod_sin(arr, frac=0.05, in_place=False):
 
     return apod_arr
 
-def normalized_psd(arr, sampling=1, real=False):
+def normalized_psd(arr, sampling=1, real=False, keep_freq0=False):
     ''' Compute the normalized power spectral density (PSD).
 
     This function uses np.fft.fft in order to compute the Fourier transform,
@@ -104,6 +104,9 @@ def normalized_psd(arr, sampling=1, real=False):
         Spacing of the points in arr.
     real : bool (default: False)
         If True, use np.fft.rfft instead of np.fft.fft.
+    keep_freq0 (default: False):
+        If True, keep the zero-frequency term, which is the simply the sum of
+        the input signal.
 
     Returns
     =======
@@ -119,6 +122,9 @@ def normalized_psd(arr, sampling=1, real=False):
         freq = np.fft.fftfreq(arr.size, d=sampling)
         ft = np.fft.fft(arr, norm='ortho')
         psdt = ft*np.conj(ft) / np.std(arr)**2
+    if not keep_freq0:
+        freq = freq[1:]
+        psdt = psdt[1:]
     return freq, psdt
 
 # Periodograms ================================================================
