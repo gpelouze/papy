@@ -1,5 +1,6 @@
 ''' Matplotlib tools. '''
 
+from astropy.wcs import WCS
 import numpy as np
 
 import matplotlib as mpl
@@ -462,6 +463,40 @@ def plot_map(ax, arr, coordinates=None, xlog=None, ylog=None, **kwargs):
         add_log_labels_to_map(ax, arr, coordinates, extent, ylog, 'y')
 
     return img
+
+# FITS ------------------------------------------------------------------------
+
+def plot_image_hdu(ax, hdu, **kwargs):
+    ''' Plot the image from a FITS HDU, taking into account affine WCS
+    transforms.
+
+    Parameters
+    ==========
+    ax : matplotlib axis
+    hdu : an astropy HDU object
+        The HDU containing a 2D image data and a header with WCS keywords.
+    **kwargs :
+        Passed to ax.imshow.
+    '''
+
+    w = WCS(hdu.header)
+    matrix_linear = w.pixel_scale_matrix * 3600 # arcsec/px
+    tr_x, tr_y = w.all_world2pix(0, 0, 0) # px
+    matrix_affine = np.zeros((3, 3))
+    matrix_affine[:2, :2] = matrix_linear
+    matrix_affine[2, 2] = 1
+    matrix_affine = np.linalg.inv(matrix_affine)
+    matrix_affine[0, 2] = tr_x
+    matrix_affine[1, 2] = tr_y
+    matrix_affine = np.linalg.inv(matrix_affine)
+    transform = mpl.transforms.Affine2D(matrix_affine)
+
+    im = ax.imshow(hdu.data, **kwargs)
+
+    trans_data = transform + ax.transData
+    im.set_transform(trans_data)
+
+    return im
 
 # Pixel contours --------------------------------------------------------------
 
