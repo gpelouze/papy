@@ -466,6 +466,46 @@ def plot_map(ax, arr, coordinates=None, xlog=None, ylog=None, **kwargs):
 
 # FITS ------------------------------------------------------------------------
 
+def wcs_transform(wcs):
+    ''' Get the matplotlib affine transform from a WCS object
+
+    Parameters
+    ==========
+    wcs : astropy.wcs.WCS
+        The WCS object from which to determine the transform.
+
+    Returns
+    =======
+    transform : matplotlib.transforms.Affine2D
+        The affine transformation from wcs.
+    '''
+    if wcs.has_distortion:
+        raise ValueError('distortion not supported')
+    matrix_linear = wcs.pixel_scale_matrix * 3600
+    tr_x, tr_y = wcs.all_world2pix(0, 0, 0)
+    matrix_affine = np.zeros((3, 3))
+    matrix_affine[:2, :2] = matrix_linear
+    matrix_affine[2, 2] = 1
+    matrix_affine = np.linalg.inv(matrix_affine)
+    matrix_affine[0, 2] = tr_x
+    matrix_affine[1, 2] = tr_y
+    matrix_affine = np.linalg.inv(matrix_affine)
+    return mpl.transforms.Affine2D(matrix_affine)
+
+def set_wcs_transform(artist, wcs):
+    ''' Transform an artist with a WCS object
+
+    Parameters
+    ==========
+    artist : matplotlib artist
+        The object to transform (can be image, lines, etc.).
+    wcs : astropy.wcs.WCS
+        The WCS object used to transform the artist.
+        See also `wcs_transform()`
+    '''
+    trans_data = wcs_transform(wcs) + artist.axes.transData
+    artist.set_transform(trans_data)
+
 def plot_image_hdu(ax, hdu, **kwargs):
     ''' Plot the image from a FITS HDU, taking into account affine WCS
     transforms.
@@ -478,24 +518,8 @@ def plot_image_hdu(ax, hdu, **kwargs):
     **kwargs :
         Passed to ax.imshow.
     '''
-
-    w = WCS(hdu.header)
-    matrix_linear = w.pixel_scale_matrix * 3600 # arcsec/px
-    tr_x, tr_y = w.all_world2pix(0, 0, 0) # px
-    matrix_affine = np.zeros((3, 3))
-    matrix_affine[:2, :2] = matrix_linear
-    matrix_affine[2, 2] = 1
-    matrix_affine = np.linalg.inv(matrix_affine)
-    matrix_affine[0, 2] = tr_x
-    matrix_affine[1, 2] = tr_y
-    matrix_affine = np.linalg.inv(matrix_affine)
-    transform = mpl.transforms.Affine2D(matrix_affine)
-
     im = ax.imshow(hdu.data, **kwargs)
-
-    trans_data = transform + ax.transData
-    im.set_transform(trans_data)
-
+    set_wcs_transform(im, WCS(hdu.header))
     return im
 
 # Pixel contours --------------------------------------------------------------
