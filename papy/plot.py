@@ -406,11 +406,6 @@ def map_extent(img, coordinates):
         xmax = x[-1]
         ymin = y[0]
         ymax = y[-1]
-        # swap values if values were in decreasing order
-        if xmin > xmax:
-            xmin, xmax = xmax, xmin
-        if ymin > ymax:
-            ymin, ymax = ymax, ymin
 
     x_step = (xmax - xmin) / (nx - 1)
     y_step = (ymax - ymin) / (ny - 1)
