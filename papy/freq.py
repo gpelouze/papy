@@ -110,8 +110,10 @@ def normalized_psd(arr, sampling=1, real=False, keep_freq0=False):
 
     Returns
     =======
+    freq : array of shape (n/2,)
+        The frequencies associated with the returned PSD.
     power : array of shape (n/2,)
-        The PSD, in \sigma**2
+        The PSD, in \sigma**2.
     '''
     arr = arr - np.mean(arr)
     if real:
