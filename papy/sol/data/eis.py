@@ -154,8 +154,10 @@ def get_fits(eis_file, custom_dest=None, force_download=False, silent=True):
         The EIS filename (eg 'eis_l0_20110803_113520'), path, URL in the MSSL
         archives, or 'prop dict'.
     custom_dest : str (default: None)
-        If set, the location where to save the FITS. If not set, the FITS is
-        saved to $SOL_OBSERVATION_DATA/hinode/eis/...
+        If set, the location where to save the FITS.
+        If custom_dest is not set, the FITS is saved to
+        $SOL_OBSERVATION_DATA/hinode/eis/ if $SOL_OBSERVATION_DATA exists,
+        or to $HOME/hinode/eis/ if it doesn't.
     force_download : bool (default: False)
         If True, always download the FITS, overwriting any local version.
 
@@ -175,7 +177,7 @@ def get_fits(eis_file, custom_dest=None, force_download=False, silent=True):
         fits_save_path = custom_dest
     else:
         fits_save_path = os.path.join(
-            os.environ.get('SOL_OBSERVATION_DATA'),
+            os.environ.get('SOL_OBSERVATION_DATA', os.environ.get('HOME')),
             'hinode',
             fits_path(eis_properties, gz=True))
     # determine if .fits.gz or .fits
