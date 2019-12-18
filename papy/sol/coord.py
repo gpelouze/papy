@@ -404,7 +404,7 @@ def heeq_to_stonyhurst(Xheeq, Yheeq, Zheeq):
     lon_hg = arg(Xheeq, Yheeq)
     return lon_hg, lat, r
 
-def stonyhurst_to_heeq(lon_hg, lat, r, R0=1):
+def stonyhurst_to_heeq(lon_hg, lat, r=None, R0=1):
     ''' Convert heliographic Stonyhurst to heliocentric earth equatorial (HEEQ)
     coordinates.  Thompson2006 Eq. (2)
 
