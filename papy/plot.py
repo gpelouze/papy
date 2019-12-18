@@ -450,6 +450,7 @@ def plot_map(ax, arr, coordinates=None, xlog=None, ylog=None, **kwargs):
     img = ax.imshow(
         arr,
         extent=extent,
+        origin='lower',
         **kwargs)
 
     if xlog is not None:
