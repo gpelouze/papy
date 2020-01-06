@@ -405,9 +405,10 @@ def map_extent(img, coordinates, regularity_threshold=0.01):
             raise ValueError('invalid array shape')
     else:
         raise ValueError('invalid number of dimensions')
-    try:
+
+    if len(coordinates) == 4:
         xmin, xmax, ymin, ymax = coordinates
-    except ValueError:
+    elif len(coordinates) == 2:
         x, y = coordinates
         if regularity_threshold is not None:
             for s in (x, y):
@@ -418,6 +419,8 @@ def map_extent(img, coordinates, regularity_threshold=0.01):
         xmax = x[-1]
         ymin = y[0]
         ymax = y[-1]
+    else:
+        raise ValueError('invalid coordinates shape')
 
     x_step = (xmax - xmin) / (nx - 1)
     y_step = (ymax - ymin) / (ny - 1)
