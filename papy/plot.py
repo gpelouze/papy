@@ -373,7 +373,7 @@ def colorbar(ax, mappable, position, size='10%', pad=0.5,
 
 # Map -------------------------------------------------------------------------
 
-def map_extent(img, coordinates):
+def map_extent(img, coordinates, regularity_threshold=0.01):
     ''' Compute the extent to use in ax.imshow to plot an image with
     coordinates
 
@@ -385,6 +385,13 @@ def map_extent(img, coordinates):
         Either a list of bounding coordinates [xmin, xmax, ymin, ymax], pretty
         much like the extent keyword of ax.imshow, or a tuple containing
         two 1D arrays of evenly-spaced x and y values.
+    regularity_threshold : float or None (default: 0.01)
+        If coordinates is a tuple of x and y values, check that they are evenly
+        spaced by ensuring that :
+            std(x) / mean(x) < regularity_threshold   and
+            std(y) / mean(y) < regularity_threshold
+        Raise ValueError('unevenly-spaced array') if this is not verified.
+        If regularity_threshold=None, the check is not performed.
 
     The computed boundaries are the centers of the corresponding pixel. This
     differs from the behaviour of ax.imshow with the extent keyword, where the
@@ -402,6 +409,11 @@ def map_extent(img, coordinates):
         xmin, xmax, ymin, ymax = coordinates
     except ValueError:
         x, y = coordinates
+        if regularity_threshold is not None:
+            for s in (x, y):
+                ds = s[1:] - s[:-1]
+                if np.abs(np.std(ds) / np.mean(ds)) > regularity_threshold:
+                    raise ValueError('unevenly-spaced array')
         xmin = x[0]
         xmax = x[-1]
         ymin = y[0]
@@ -415,7 +427,8 @@ def map_extent(img, coordinates):
     ymax += y_step / 2
     return xmin, xmax, ymin, ymax
 
-def plot_map(ax, arr, coordinates=None, xlog=None, ylog=None, **kwargs):
+def plot_map(ax, arr, coordinates=None, xlog=None, ylog=None,
+             regularity_threshold=0.01, **kwargs):
     ''' Plot an image with coordinates
 
     Parameters
@@ -433,6 +446,8 @@ def plot_map(ax, arr, coordinates=None, xlog=None, ylog=None, **kwargs):
         this is either a 2-tuple containing the start and stop exponents
         for the log values, or an 1D array of the same length as the size of
         the image along the corresponding axis, containing the log values.
+    regularity_threshold : float or None (default: 0.01)
+        passed to map_extent() (see doc there).
     **kwargs :
         Passed to ax.imshow.
 
@@ -440,7 +455,8 @@ def plot_map(ax, arr, coordinates=None, xlog=None, ylog=None, **kwargs):
     '''
 
     if coordinates:
-        extent = map_extent(arr, coordinates)
+        extent = map_extent(arr, coordinates,
+            regularity_threshold=regularity_threshold)
     else:
         try:
             extent = kwargs.pop('extent')
