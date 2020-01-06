@@ -7,13 +7,13 @@ with open('requirements.txt', 'r') as f:
 
 setuptools.setup(
     name='papy',
-    version='2018.11.25',
+    version='2020.1.6',
     author='Gabriel Pelouze',
     author_email='gabriel@pelouze.net',
     description='Small additions to Python that may make your life easier',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/ArcturusB/papy',
+    url='https://github.com/gpelouze/papy',
     packages=setuptools.find_packages(),
     python_requires='>=3.5',
     install_requires=requirements,
