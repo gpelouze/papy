@@ -214,7 +214,6 @@ def aggressive_autoscale(axes, axis, margin=0.1):
     data_limits = []
     for line in axes.get_lines():
         # determine line data limits
-        line_limits = get_line_data_limits(line)
         xdata = line.get_xdata()
         ydata = line.get_ydata()
         xmin, xmax = line.axes.get_xlim()
