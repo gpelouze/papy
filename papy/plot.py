@@ -305,7 +305,53 @@ def auto_lim_cube(data, x=None, y=None, threshold=0.9):
     displayed_pixels = (coverage > (1 - threshold))
     return auto_lim(displayed_pixels, x, y)
 
-# Cmap and colorbar -----------------------------------------------------------
+# Normalize and colormap ------------------------------------------------------
+
+class SymmetricNormalize(mpl.colors.Normalize):
+    """
+    An extension of the matplotlib.colors.Normalize class which guarantees that
+    the data interval is centered around 0.
+    """
+    def __init__(self, vlim=None, clip=False):
+        """
+        If *vlim* is not given, it is initialized from the
+        minimum and maximum value of the first input
+        processed.  That is, *__call__(A)* calls *autoscale_None(A)*.
+        If *clip* is *True* and the given value falls outside the range,
+        the returned value will be 0 or 1, whichever is closer.
+        Returns 0 if::
+
+            vlim==0
+
+        Works with scalars or arrays, including masked arrays.  If
+        *clip* is *True*, masked values are set to 1; otherwise they
+        remain masked.  Clipping silently defeats the purpose of setting
+        the over, under, and masked colors in the colormap, so it is
+        likely to lead to surprises; therefore the default is
+        *clip* = *False*.
+        """
+        if vlim is None:
+            vmin = vmax = vlim
+        else:
+            vmin = -abs(vlim)
+            vmax = +abs(vlim)
+        super().__init__(vmin=vmin, vmax=vmax, clip=clip)
+
+    def autoscale(self, A):
+        """
+        Set *vmin* and *vmax* such that *vmax >= 0*, *vmin = -vmax*, and all
+        values of *A* fall between *vmin* and *vmax*.
+        """
+        A = np.asanyarray(A)
+        vlim = np.max(np.abs([A.min(), A.max()]))
+        self.vmin = -vlim
+        self.vmax = +vlim
+
+    def autoscale_None(self, A):
+        """Same as autoscale to ensure that *vmin = -vmax*."""
+        self.autoscale(A)
+
+# Colorbar --------------------------------------------------------------------
 
 def get_extend(data, **kwargs):
     ''' Get the extent to pass to plt.colorbar()
