@@ -349,7 +349,9 @@ class SymmetricNormalize(mpl.colors.Normalize):
 
     def autoscale_None(self, A):
         """Same as autoscale to ensure that *vmin = -vmax*."""
-        self.autoscale(A)
+        A = np.asanyarray(A)
+        if self.vmin is None and self.vmax is None and A.size:
+            self.autoscale(A)
 
 # Colorbar --------------------------------------------------------------------
 
