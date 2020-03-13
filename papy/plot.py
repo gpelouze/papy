@@ -526,6 +526,92 @@ def plot_map(ax, arr, coordinates=None, xlog=None, ylog=None,
 
     return img
 
+class MapMovie():
+    def __init__(self, fig, arr, coordinates=None, interval=50, **kwargs):
+        ''' Display or save a movie of maps
+
+        Parameters
+        ==========
+        fig : matplotlib.figure.Figure
+            Matplotlib figure to which the movie is played.
+        arr : 3D array
+            Movie data, with axes as (time, y, x)
+        coordinates : None or 2-tuple
+            Passed to papy.plot.plot_map
+        interval : number or None (default: 50)
+            Delay between frames in milliseconds. (Passed to
+            mpl.animation.FuncAnimation.)
+        **kwargs :
+            Passed to fig.gca().imshow through papy.plot_map.
+
+        Methods
+        =======
+        play() :
+            Display the movie in a matplotlib window
+        save(path) :
+            Save a mp4 movie.
+        '''
+
+        self.fig = fig
+        self.ax = None
+
+        self.arr = arr
+        self.coordinates = coordinates
+
+        # Args passed to matplotlib imshow
+        self.imshow_kwargs = kwargs
+
+    def init_plot(self):
+        self.fig.clear()
+        self.ax = self.fig.gca()
+        self.im = plot_map(
+            self.ax,
+            self.arr[0],
+            coordinates=self.coordinates,
+            animated=True,
+            **self.imshow_kwargs)
+        self.cbar = self.fig.colorbar(self.im)
+
+    def update(self, i):
+        self.im.set_data(self.arr[i])
+        self.ax.set_title('Step {:03d}'.format(i))
+
+        # Set vmin and vmax from current frame data if no norm, vlim, or vmax
+        # are passed as kwargs.
+        if 'norm' not in self.imshow_kwargs:
+            try:
+                vmin = self.imshow_kwargs['vmin']
+            except KeyError:
+                vmin = np.nanmin(self.arr[i])
+            try:
+                vmax = self.imshow_kwargs['vmax']
+            except KeyError:
+                vmax = np.nanmax(self.arr[i])
+            self.im.set_clim(vmin, vmax)
+
+        return self.im,
+
+    def play(self):
+        ''' Play the movie in a matplotlib window. '''
+        self.init_plot()
+        self.anim = mpl.animation.FuncAnimation(
+            self.fig,
+            self.update,
+            frames=len(self.arr),
+            interval=self.interval,
+            )
+
+    def save(self, filename, fps=15, bitrate=1800, **kwargs):
+        ''' Save a mp4 movie to `filename`. kwargs are passed to the matplotlp
+        ffmpeg writer '''
+        try:
+            self.anim
+        except AttributeError:
+            self.play()
+        Writer = mpl.animation.writers['ffmpeg']
+        writer = Writer(fps=fps, bitrate=bitrate)
+        self.anim.save(filename, writer=writer)
+
 # FITS ------------------------------------------------------------------------
 
 def wcs_transform(wcs):
