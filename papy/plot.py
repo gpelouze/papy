@@ -513,6 +513,13 @@ def plot_map(ax, arr, coordinates=None, xlog=None, ylog=None,
         except KeyError:
             extent = None
 
+    if 'origin' in kwargs:
+        origin = kwargs.pop('origin')
+        if origin not in ('lower', 'upper'):
+            raise ValueError(f'unsupported origin: {origin}')
+        if origin == 'upper':
+            arr = arr[::-1]
+
     img = ax.imshow(
         arr,
         extent=extent,
