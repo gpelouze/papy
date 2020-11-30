@@ -1,4 +1,10 @@
 python-dateutil>=2.7
-numpy>=1.15
-scipy>=1.0
+numpy>=1.16
+scipy>=1.4
 matplotlib>=2.0
+astropy>=4.0
+dateutil
+requests>=2.20
+sunpy>=1.0.0
+bs4
+urllib
