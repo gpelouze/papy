@@ -3,8 +3,7 @@ numpy>=1.16
 scipy>=1.4
 matplotlib>=2.0
 astropy>=4.0
-dateutil
+python-dateutil
 requests>=2.20
 sunpy>=1.0.0
-bs4
-urllib
+beautifulsoup4>=4.6.0
