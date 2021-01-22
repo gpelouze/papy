@@ -482,7 +482,7 @@ def stonyhurst_to_carington(lon_hg, lat, r, observer):
 
 
 def stonyhurst_to_heliocentric(lon_hg, lat, r, observer, R0=1):
-    ''' Convert heliocentric cartesian to heliographic Stonyhurst coordinates.
+    ''' Convert heliographic Stonyhurst to heliocentric cartesian coordinates.
     Thompson2006 Eq. (11)
 
     Parameters
