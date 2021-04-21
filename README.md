@@ -12,6 +12,9 @@ cd papy
 pip install .
 ~~~
 
+**Warning:** running `pip install papy` **will not work**.
+This installs an unrelated Python 2.7 package of the same name.
+
 ## License
 
 This package is released under a MIT open source licence. See `LICENSE.txt`.
