@@ -187,6 +187,7 @@ class EUISelektorClient():
         (users will be asked to type them in).
         '''
         CredentialsManager().get_credentials(force_keyring_update=True)
+        self.__http_auth = self._get_http_auth()
 
     def _query(self, params=None):
         ''' Send HTTP query to selektor and return response. '''
