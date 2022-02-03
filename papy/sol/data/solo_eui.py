@@ -307,7 +307,10 @@ class EUISelektorClient():
         search_params = self._fill_default_search_params(search_params)
         r = self._query(params=search_params)
         dfs = pd.read_html(r.content)
-        return dfs[2]
+        try:
+            return dfs[2]
+        except IndexError:
+            return None
 
 
 if __name__ == '__main__':
