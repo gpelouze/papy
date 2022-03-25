@@ -1,14 +1,6 @@
 #!/usr/share/bin python
 
 import os
-
-try:
-    from urllib.parse import quote as urlquote
-    from urllib.request import urlopen
-except ImportError:
-    # Python 2.7
-    from urllib2 import quote as urlquote
-    from urllib import urlopen
 import warnings
 
 from astropy.io import fits
@@ -153,7 +145,7 @@ class HinodeQuery:
             self.search_params,
             mode=mode)
         # url-encode values
-        params = {k: urlquote(v)
+        params = {k: requests.utils.requote_uri(v)
             for k, v in params.items() if v is not None}
         # join (k1=v1;k2=v2;k3=v3)
         params = ['='.join(p) for p in params.items()]
@@ -295,9 +287,9 @@ class HinodeQuery:
         url = qr_text.search_url(mode=mode)
 
         # download data
-        http = urlopen(url)
-        data = http.read()
-        data = data.decode()
+        r = requests.get(url)
+        r.raise_for_status()
+        data = r.text
         data = self._parse_text_result(data)
         try:
             data = self._result_list_to_recarray(data)
