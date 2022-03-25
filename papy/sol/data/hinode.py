@@ -3,14 +3,12 @@
 import os
 import warnings
 
-from astropy.io import fits
 import numpy as np
 import requests
 
 
 class HinodeQuery:
-
-    ''' A class for browsing the Hinode SDC Europe database (http://sdc.uio.no).
+    ''' A class for browsing the Hinode SDC (http://sdc.uio.no).
 
     Example
     =======
@@ -27,7 +25,8 @@ class HinodeQuery:
     >>> q = HinodeQuery(search_params, mode='html')
     >>> res = q.get_results(return_fields=return_fields)
     >>> print(res[:4].__repr__())
-    rec.array([ ('eis_l0_20120101_231443', '2012-01-01 23:14:43', 33021, 179.712, 152.0, -433.88, -378.936),
+    rec.array([
+     ('eis_l0_20120101_231443', '2012-01-01 23:14:43', 33021, 179.712, 152.0, -433.88, -378.936),
      ('eis_l0_20120101_134553', '2012-01-01 13:45:53', 33022, 179.712, 152.0, -500.699, -381.717),
      ('eis_l0_20120101_230923', '2012-01-01 23:09:23', 33021, 179.712, 152.0, -434.576, -379.168),
      ('eis_l0_20120101_213832', '2012-01-01 21:38:32', 33021, 179.712, 152.0, -445.39, -379.554)],
@@ -41,24 +40,24 @@ class HinodeQuery:
 
     default_search_params = {
         'display': {
-            'el': ',,192.39,195.12', # eis lines to display in thumbnails
-            'en': '3', # max eis lines
-            'ep': 'IV', # thumbs to display: I, V, W, IV, VW, or IVW. (Int, Vel, Wid)
-            's': ',FILE,INSTRUME,DATE_OBS', # columns displayed in the table
-            'c_s': 'y', # Auto-include search fields (y/n)
-            'th': 'y', # Show thumbnails (y/n)
-            'O': 'DATE', # Sort order
-            'o': 'D', # Sort order direction (Ascending/Descending)
-            'Gx': 'NONE', # Expand result to include whole group (same values as G)
+            'el': ',,192.39,195.12',  # eis lines to display in thumbnails
+            'en': '3',  # max eis lines
+            'ep': 'IV',  # thumbs to display: I, V, W, IV, VW, or IVW. (Int, Vel, Wid)
+            's': ',FILE,INSTRUME,DATE_OBS',  # columns displayed in the table
+            'c_s': 'y',  # Auto-include search fields (y/n)
+            'th': 'y',  # Show thumbnails (y/n)
+            'O': 'DATE',  # Sort order
+            'o': 'D',  # Sort order direction (Ascending/Descending)
+            'Gx': 'NONE',  # Expand result to include whole group (same values as G)
             },
         'html': {
-            'P': '1', # page
-            'L': '10', # rows per page
-            'G': 'IUMODE1', # grouping (IUMODE[0-3] (very fine, fine, medium, coarse),
-                # WEEK, DAY, HOUR, SCI_OBJ_PROG, OBSTITLE_PROG_VER, STUDY_SEQ, NONE)
+            'P': '1',  # page
+            'L': '10',  # rows per page
+            'G': 'IUMODE1',  # grouping (IUMODE[0-3]: very fine, fine, medium, coarse)
+            # WEEK, DAY, HOUR, SCI_OBJ_PROG, OBSTITLE_PROG_VER, STUDY_SEQ, NONE)
             },
         'text': {
-            'j': 'y', # ?
+            'j': 'y',  # ?
             },
         }
 
@@ -146,7 +145,7 @@ class HinodeQuery:
             mode=mode)
         # url-encode values
         params = {k: requests.utils.requote_uri(v)
-            for k, v in params.items() if v is not None}
+                  for k, v in params.items() if v is not None}
         # join (k1=v1;k2=v2;k3=v3)
         params = ['='.join(p) for p in params.items()]
         query_string = ';'.join(params)
@@ -182,8 +181,8 @@ class HinodeQuery:
         # split text into lines
         # split lines into rows (rows are separated by \t)
         # strip leading/trailing quotes and spaces from each cell
-        res = [ [cell.strip("' ") for cell in row.split('\t')]
-                for row in text.splitlines() ]
+        res = [[cell.strip("' ") for cell in row.split('\t')]
+               for row in text.splitlines()]
         # first line is the number of results found; remove it
         res = res[1:]
         return res
@@ -393,7 +392,6 @@ class HinodeData:
 
 
 if __name__ == '__main__':
-
 
     search_params = {
         's': ',FILE',
