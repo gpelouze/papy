@@ -1,5 +1,7 @@
 #!/usr/share/bin python
 
+import os
+
 try:
     from urllib.parse import quote as urlquote
     from urllib.request import urlopen
@@ -9,8 +11,9 @@ except ImportError:
     from urllib import urlopen
 import warnings
 
-import requests
+from astropy.io import fits
 import numpy as np
+import requests
 
 
 class HinodeQuery:
@@ -308,6 +311,94 @@ class HinodeQuery:
                 # data is not empty and another error occured
                 raise e
         return data
+
+
+class HinodeData:
+    ''' A class for downloading data from the Hinode SDC (http://sdc.uio.no).
+    '''
+
+    def __init__(self, data_dir='.'):
+        ''' Create new HinodeData instance.
+
+        Parameters
+        ==========
+        data_dir : str or '.'
+            Directory where downloaded data is stored.
+        '''
+        self.data_dir = data_dir
+        os.makedirs(self.data_dir, exist_ok=True)
+
+    def _add_ext(self, file, gz=True):
+        ''' Add the .fits or .fits.gz extension to a file. '''
+        if not file.endswith('.fits'):
+            file = file + '.fits'
+        if gz and not file.endswith('.gz'):
+            file = file + '.gz'
+        return file
+
+    def _download_dest(self, file, gz=True):
+        ''' Get the download destination for a file. '''
+        return os.path.join(
+            self.data_dir,
+            self._add_ext(file, gz=gz))
+
+    def _download_file(self, url, dst):
+        ''' Download the file at url and save it at dst. '''
+        response = requests.get(url, stream=True)
+        if not response.ok:
+            raise ValueError('Could not download {}'.format(url))
+        with open(dst, 'wb') as f:
+            for block in response.iter_content(1024):
+                f.write(block)
+
+    def file_url(self, file, gz=True):
+        ''' Get the download URL of a file.
+
+        Parameters
+        ==========
+        file : str
+            Filename (e.g. 'eis_l0_20091013_182041.fits').
+        gz : bool (default: True)
+            If True, get the url of the gzipped file.
+
+        Returns
+        =======
+        url : str
+            Download URL (eg
+            'http://sdc.uio.no/search/file/eis_l0_20091013_182041.fits').
+        '''
+        return 'http://sdc.uio.no/search/file/' + self._add_ext(file, gz=gz)
+
+    def download(self, file, gz=True, force_download=False, silent=False):
+        ''' Download a file
+
+        Parameters
+        ==========
+        file : str
+            Filename (e.g. 'eis_l0_20091013_182041.fits').
+        gz : bool (default: True)
+            If True, download a gzipped file.
+        force_download : bool (default: False)
+            Download the file, even if a local copy already exists.
+        silent : bool (default: False)
+            Suppress output.
+
+        Returns
+        =======
+        downloaded_file : str
+            Path of the downloaded file.
+        '''
+        url = self.file_url(file)
+        downloaded_file = self._download_dest(file, gz=gz)
+        if force_download or not os.path.isfile(downloaded_file):
+            if not silent:
+                print(f'Downloading {url} to {downloaded_file}')
+            self._download_file(url, downloaded_file)
+        else:
+            if not silent:
+                print(f'Found file {downloaded_file}, skipping download')
+        return downloaded_file
+
 
 if __name__ == '__main__':
 
