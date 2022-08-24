@@ -92,8 +92,8 @@ def rebin(arr, binning, cut_to_bin=False, method=np.sum):
             m += ' Clipping array to {}.'
             m = m.format(tuple(np.array(arr.shape) - new_shape_residual))
             print(m)
-            new_slice = [slice(None, -i) if i else slice(None)
-                         for i in new_shape_residual]
+            new_slice = tuple(slice(None, -i) if i else slice(None)
+                              for i in new_shape_residual)
             arr = arr[new_slice]
         else:
             raise ValueError(m)
