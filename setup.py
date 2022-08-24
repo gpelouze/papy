@@ -7,7 +7,7 @@ with open('requirements.txt', 'r') as f:
 
 setuptools.setup(
     name='papy',
-    version='2021.4.21',
+    version='2022.8.24',
     author='Gabriel Pelouze',
     author_email='gabriel@pelouze.net',
     description='Small additions to Python that may make your life easier',
